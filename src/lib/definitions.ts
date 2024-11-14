@@ -3,7 +3,9 @@ export type Game = {
   name: string;
   uuid: string;
 };
-export const gateway = import.meta.env.VITE_API_GATEWAY as string;
+export const gateway = import.meta.env.DEV
+  ? (import.meta.env.VITE_API_GATEWAY as string)
+  : "";
 
 export enum SocketMessageType {
   SAY_HELLO = "say_hello",
