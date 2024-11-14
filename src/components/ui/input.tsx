@@ -13,7 +13,7 @@ type Props<T extends FieldValues> = React.ComponentProps<"input"> & {
 function Input<T extends FieldValues>(props: Props<T>) {
   const { name, label, wrapperClassName, control, className, ...rest } = props;
 
-  if (!control) {
+  if (!control || !name) {
     return (
       <input
         className={cn(
