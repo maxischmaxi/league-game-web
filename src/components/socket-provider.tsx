@@ -1,6 +1,7 @@
 import { useGame } from "@/hooks/use-game";
 import {
   Answer,
+  gateway,
   Player,
   SetAnswerMessage,
   SetTextMessage,
@@ -10,7 +11,7 @@ import {
 import { SocketContext } from "@/lib/socket";
 import { ReactNode, useEffect, useState } from "react";
 
-const ws = new WebSocket("http://localhost:8080/ws");
+const ws = new WebSocket(`${gateway}/ws`);
 
 function getCanType() {
   const data: SocketMessage = {
