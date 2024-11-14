@@ -3,6 +3,9 @@ export type Game = {
   name: string;
   uuid: string;
 };
+
+console.log(import.meta.env);
+
 export const gateway = import.meta.env.DEV
   ? (import.meta.env.VITE_API_GATEWAY as string)
   : "";
