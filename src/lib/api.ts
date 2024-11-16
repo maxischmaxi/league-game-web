@@ -1,5 +1,3 @@
-import { z } from "zod";
-import { enterGameSchama } from "./schemas";
 import { Game, gateway } from "./definitions";
 
 export const api = {
@@ -39,19 +37,5 @@ export const api = {
     }
 
     return await res.json();
-  },
-  async joinGame(data: z.infer<typeof enterGameSchama>): Promise<void> {
-    const res = await fetch(`${gateway}/game/join`, {
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(data),
-    });
-
-    if (!res.ok) {
-      throw new Error("Failed to join game");
-    }
-
-    return;
   },
 };

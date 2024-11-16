@@ -1,10 +1,9 @@
-import { useGame } from "@/hooks/use-game";
 import {
   Answer,
+  Game,
   gateway,
   Player,
-  SetAnswerMessage,
-  SetTextMessage,
+  GameRound,
   SocketMessage,
   SocketMessageType,
 } from "@/lib/definitions";
@@ -13,34 +12,49 @@ import { ReactNode, useEffect, useState } from "react";
 
 const ws = new WebSocket(`${gateway}/ws`);
 
-function getCanType() {
-  const data: SocketMessage = {
-    type: SocketMessageType.GET_CAN_TYPE,
-    payload: "",
-  };
-
-  ws.send(JSON.stringify(data));
-}
-
-function getConnectedUsers() {
-  const data: SocketMessage = {
-    type: SocketMessageType.GET_CONNECTED_USERS,
-    payload: "",
-  };
-
-  ws.send(JSON.stringify(data));
-}
-
-function sayHello() {
-  const uuid = localStorage.getItem("uuid");
-  if (!uuid) {
+function getRounds() {
+  const gameId = localStorage.getItem("game-id");
+  if (!gameId) {
     return;
   }
 
   const data: SocketMessage = {
-    type: SocketMessageType.SAY_HELLO,
-    payload: uuid,
+    type: SocketMessageType.GET_ROUNDS,
+    payload: gameId,
   };
+
+  ws.send(JSON.stringify(data));
+}
+
+function getRound() {
+  const gameId = localStorage.getItem("game-id");
+  if (!gameId) {
+    return;
+  }
+
+  const data: SocketMessage = {
+    type: SocketMessageType.GET_ROUND,
+    payload: gameId,
+  };
+
+  ws.send(JSON.stringify(data));
+}
+
+function getConnectedPlayers() {
+  const data: SocketMessage = {
+    type: SocketMessageType.GET_CONNECTED_PLAYERS,
+    payload: "",
+  };
+
+  ws.send(JSON.stringify(data));
+}
+
+function getAllGames() {
+  const data: SocketMessage = {
+    type: SocketMessageType.GET_GAMES,
+    payload: "",
+  };
+
   ws.send(JSON.stringify(data));
 }
 
@@ -53,38 +67,82 @@ function joinGame(gameId: string) {
 }
 
 function getCurrentText() {
+  const gameId = localStorage.getItem("game-id");
+  if (!gameId) {
+    return;
+  }
+
   const data: SocketMessage = {
     type: SocketMessageType.GET_TEXT,
-    payload: "",
+    payload: gameId,
+  };
+  ws.send(JSON.stringify(data));
+}
+
+function getGame() {
+  const gameId = localStorage.getItem("game-id");
+  if (!gameId) {
+    return;
+  }
+
+  const data: SocketMessage = {
+    type: SocketMessageType.GET_GAME,
+    payload: gameId,
   };
   ws.send(JSON.stringify(data));
 }
 
 export function SockerProvider({ children }: { children: ReactNode }) {
+  const [uuid, setUuid] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
-  const { nickname, setNickname, uuid } = useGame();
+  const [nickname, setNickname] = useState("");
+  const [round, setRound] = useState<GameRound | null>(null);
+  const [previewed, setPreviewed] = useState<string[]>([]);
   const [allAnswers, setAllAnswers] = useState<Answer[]>([]);
+  const [game, setGame] = useState<Game | null>(null);
   const [currentText, setCurrentText] = useState("");
-  const [canType, setCanType] = useState(false);
-  const [connectedUsers, setConnectedUsers] = useState<Player[]>([]);
-  const [gameId, setGameId] = useState<string | null>(
-    localStorage.getItem("game-id") ?? null,
-  );
+  const [connectedPlayers, setConnectedPlayers] = useState<Player[]>([]);
+  const [games, setGames] = useState<Game[]>([]);
+  const [rounds, setRounds] = useState<GameRound[]>([]);
+
+  useEffect(() => {
+    const uuidItem = localStorage.getItem("uuid");
+    if (uuidItem) {
+      setUuid(uuidItem);
+    }
+
+    const nickItem = localStorage.getItem("nickname");
+    if (nickItem) {
+      setNickname(nickItem);
+    }
+
+    if (connected && uuid && nickname) {
+      sayHello();
+    }
+  }, [connected, nickname, uuid]);
 
   useEffect(() => {
     function onConnect() {
       setConnected(true);
-      sayHello();
+    }
+
+    function close() {
+      setConnected(false);
+      setGame(null);
+      setAllAnswers([]);
+      setCurrentText("");
+      setConnectedPlayers([]);
     }
 
     function onDisconnect() {
       console.log("disconnected");
-      setConnected(false);
+      close();
     }
 
     function onError() {
       console.log("error");
-      setConnected(false);
+      close();
+      localStorage.removeItem("game-id");
     }
 
     function onMessage(event: MessageEvent) {
@@ -100,79 +158,98 @@ export function SockerProvider({ children }: { children: ReactNode }) {
             ws.send(JSON.stringify(data));
           }
 
-          if (gameId !== null) {
-            joinGame(gameId);
+          if (game !== null) {
+            joinGame(game.id);
           }
           break;
         case SocketMessageType.PLAYER_DISCONNECTED: {
-          const disconnectedUser = JSON.parse(data.payload as string) as {
-            uuid: string;
-            nickname: string;
-            gameId: string;
-          };
-          setConnectedUsers((prev) => {
-            return prev.filter((x) => x.uuid !== disconnectedUser.uuid);
-          });
+          const disconnectedPlayer = JSON.parse(
+            data.payload as string,
+          ) as Player;
+          setConnectedPlayers((prev) =>
+            prev.filter((x) => x.id !== disconnectedPlayer.id),
+          );
           break;
         }
+        case SocketMessageType.PREVIEWED_GAMES:
+          setPreviewed(JSON.parse(data.payload as string));
+          break;
         case SocketMessageType.ALL_ANSWERS:
           setAllAnswers(JSON.parse(data.payload as string));
           break;
+        case SocketMessageType.SET_UUID:
+          localStorage.setItem("uuid", data.payload as string);
+          setUuid(data.payload as string);
+          break;
+        case SocketMessageType.GET_GAMES:
+          setGames(JSON.parse(data.payload as string));
+          break;
+        case SocketMessageType.GET_ROUND:
+          setRound(JSON.parse(data.payload as string));
+          break;
+        case SocketMessageType.GET_ROUNDS:
+          setRounds(JSON.parse(data.payload as string));
+          break;
         case SocketMessageType.PLAYER_CONNECTED: {
-          const connectedUser = JSON.parse(data.payload as string) as {
-            uuid: string;
-            nickname: string;
-            gameId: string;
-          };
-          setConnectedUsers((prev) => {
-            const index = prev.findIndex((x) => x.uuid === connectedUser.uuid);
+          const connectedPlayer = JSON.parse(data.payload as string) as Player;
+          setConnectedPlayers((prev) => {
+            const index = prev.findIndex((x) => x.id === connectedPlayer.id);
             if (index === -1) {
-              return [...prev, connectedUser];
+              return [...prev, connectedPlayer];
             }
 
             return prev;
           });
           break;
         }
-        case SocketMessageType.TEXT_UPDATE: {
-          const x = JSON.parse(data.payload as string) as SetTextMessage;
-          setCurrentText(() => {
-            return x.text;
-          });
+        case SocketMessageType.SET_TEXT: {
+          setCurrentText(data.payload as string);
           break;
         }
         case SocketMessageType.SET_NICK_SUCCESS:
+          localStorage.setItem("nickname", data.payload as string);
           setNickname(data.payload as string);
           break;
-        case SocketMessageType.CAN_TYPE: {
-          if (!gameId) {
-            setCanType(false);
-            return;
-          }
+        case SocketMessageType.GET_GAME:
+          setGame(JSON.parse(data.payload as string));
+          break;
+        case SocketMessageType.LEAVE_GAME:
+          setConnectedPlayers((prev) =>
+            prev.filter((user) => user.id !== data.payload),
+          );
+          break;
+        case SocketMessageType.CREATE_GAME: {
+          const game = JSON.parse(data.payload as string) as Game;
+          localStorage.setItem("game-id", game.id);
 
-          const ids = JSON.parse(data.payload as string) as string[];
-          setCanType(ids.includes(gameId));
+          getRound();
+          getRounds();
+          getAllGames();
           break;
         }
         case SocketMessageType.ERROR:
           console.error(data.payload);
           break;
-        case SocketMessageType.GET_CONNECTED_USERS_RESPONSE:
-          setConnectedUsers(JSON.parse(data.payload as string));
+        case SocketMessageType.GET_CONNECTED_PLAYERS:
+          setConnectedPlayers(JSON.parse(data.payload as string));
           break;
         case SocketMessageType.JOIN_GAME: {
-          const gameId = data.payload as string;
-          if (gameId === "false") {
+          if (data.payload === "false") {
             localStorage.removeItem("game-id");
-            setGameId(null);
+            setGame(null);
             return;
           }
 
-          localStorage.setItem("game-id", gameId);
-          setGameId(gameId);
-          getConnectedUsers();
-          getCanType();
+          const game = JSON.parse(data.payload as string) as Game;
+
+          localStorage.setItem("game-id", game.id);
+          setGame(game);
+          getAllGames();
+          getConnectedPlayers();
           getCurrentText();
+          getRound();
+          getRounds();
+          getGame();
           break;
         }
         default:
@@ -191,81 +268,209 @@ export function SockerProvider({ children }: { children: ReactNode }) {
       ws.removeEventListener("error", onError);
       ws.removeEventListener("message", onMessage);
     };
-  }, [gameId, nickname, setNickname, uuid]);
+  }, [game, nickname, uuid]);
 
   function setNick(nickname: string) {
-    if (!connected) {
-      return;
-    }
-
-    const data: SocketMessage = {
-      type: SocketMessageType.SET_NICK,
-      payload: nickname,
-    };
-
-    ws.send(JSON.stringify(data));
+    localStorage.setItem("nickname", nickname);
+    setNickname(nickname);
   }
 
-  function setText(gameId: string, message: string) {
+  function setText(message: string) {
     if (!connected) {
       return;
     }
 
-    const payload: SetTextMessage = {
-      text: message,
-      gameId,
-    };
+    if (!game) {
+      return;
+    }
+
+    if (!round) {
+      return;
+    }
 
     const data: SocketMessage = {
       type: SocketMessageType.SET_TEXT,
-      payload: JSON.stringify(payload),
+      payload: message,
     };
 
     ws.send(JSON.stringify(data));
   }
 
-  function setAnswer(gameId: string, answer: string) {
+  function setAnswer(answer: string) {
     if (!connected) {
       return;
     }
-
-    const payload: SetAnswerMessage = {
-      answer,
-      gameId,
-    };
 
     const data: SocketMessage = {
       type: SocketMessageType.SET_ANSWER,
-      payload: JSON.stringify(payload),
-    };
-
-    ws.send(JSON.stringify(data));
-  }
-
-  function updateCanType(value: boolean) {
-    if (!connected) {
-      return;
-    }
-
-    const data: SocketMessage = {
-      type: SocketMessageType.CAN_TYPE,
-      payload: String(value),
+      payload: answer,
     };
 
     ws.send(JSON.stringify(data));
   }
 
   function leaveGame() {
-    localStorage.removeItem("game-id");
-    setGameId(null);
-
     if (!connected) {
       return;
     }
 
+    const gameId = localStorage.getItem("game-id");
+    if (!gameId) {
+      return;
+    }
+
+    localStorage.removeItem("game-id");
+
     const data: SocketMessage = {
       type: SocketMessageType.LEAVE_GAME,
+      payload: gameId,
+    };
+
+    ws.send(JSON.stringify(data));
+    setGame(null);
+    setRound(null);
+    setAllAnswers([]);
+    setCurrentText("");
+    setConnectedPlayers([]);
+    setRounds([]);
+    setGames([]);
+  }
+
+  function reconnect() {
+    window.location.reload();
+  }
+
+  function setAnswerVisible(answerId: string) {
+    if (!connected) {
+      return;
+    }
+
+    if (!game) {
+      return;
+    }
+
+    const data: SocketMessage = {
+      type: SocketMessageType.SET_ANSWER_VISIBLE,
+      payload: answerId,
+    };
+
+    ws.send(JSON.stringify(data));
+  }
+
+  function setAnswerInvisible(uuid: string) {
+    const data: SocketMessage = {
+      type: SocketMessageType.SET_ANSWER_INVISIBLE,
+      payload: uuid,
+    };
+
+    ws.send(JSON.stringify(data));
+  }
+
+  function setPreview(gameId: string, preview: boolean) {
+    const data: SocketMessage = {
+      type: SocketMessageType.SET_PREVIEW,
+      payload: JSON.stringify({
+        gameId,
+        preview,
+      }),
+    };
+
+    ws.send(JSON.stringify(data));
+  }
+
+  function sayHello() {
+    const name = localStorage.getItem("nickname");
+    if (!name) {
+      return;
+    }
+
+    const uuid = localStorage.getItem("uuid");
+
+    const data: SocketMessage = {
+      type: SocketMessageType.SAY_HELLO,
+      payload: JSON.stringify({
+        name,
+        uuid,
+      }),
+    };
+    ws.send(JSON.stringify(data));
+  }
+
+  function createGame(name: string) {
+    const data: SocketMessage = {
+      type: SocketMessageType.CREATE_GAME,
+      payload: name,
+    };
+
+    ws.send(JSON.stringify(data));
+  }
+
+  function goNextRound() {
+    if (!game) {
+      return;
+    }
+
+    if (!round) {
+      return;
+    }
+
+    const data: SocketMessage = {
+      type: SocketMessageType.GO_NEXT_ROUND,
+      payload: JSON.stringify({
+        gameId: game.id,
+        roundId: round.id,
+      }),
+    };
+
+    ws.send(JSON.stringify(data));
+  }
+
+  function endRound() {
+    if (!game) {
+      return;
+    }
+
+    if (!round) {
+      return;
+    }
+
+    if (round.ended) {
+      return;
+    }
+
+    const data: SocketMessage = {
+      type: SocketMessageType.END_ROUND,
       payload: "",
+    };
+
+    ws.send(JSON.stringify(data));
+  }
+
+  function startRound() {
+    if (!game) {
+      return;
+    }
+
+    if (!round) {
+      return;
+    }
+
+    if (round.started) {
+      return;
+    }
+
+    const data: SocketMessage = {
+      type: SocketMessageType.START_ROUND,
+      payload: "",
+    };
+
+    ws.send(JSON.stringify(data));
+  }
+
+  function deleteAnswer(answerId: string) {
+    const data: SocketMessage = {
+      type: SocketMessageType.DELETE_ANSWER,
+      payload: answerId,
     };
 
     ws.send(JSON.stringify(data));
@@ -274,18 +479,32 @@ export function SockerProvider({ children }: { children: ReactNode }) {
   return (
     <SocketContext.Provider
       value={{
+        deleteAnswer,
+        startRound,
+        createGame,
+        game,
+        goNextRound,
+        round,
+        rounds,
         connected,
+        games,
+        setPreview,
+        setAnswerInvisible,
+        previewed,
+        setAnswerVisible,
+        reconnect,
         leaveGame,
         setNickname: setNick,
+        sayHello,
+        nickname,
+        uuid,
         joinGame,
-        canType,
-        connectedUsers,
+        connectedPlayers,
+        endRound,
         currentText,
         setText,
         setAnswer,
-        updateCanType,
         allAnswers,
-        gameId,
       }}
     >
       {children}

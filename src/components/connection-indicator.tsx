@@ -1,4 +1,3 @@
-import { useGame } from "@/hooks/use-game";
 import { useSocket } from "@/hooks/use-socket";
 import { cn } from "@/lib/utils";
 import {
@@ -9,8 +8,7 @@ import {
 } from "./ui/tooltip";
 
 export function ConnectionIndicator() {
-  const { connected } = useSocket();
-  const { uuid, nickname } = useGame();
+  const { nickname, uuid, connected } = useSocket();
 
   return (
     <div className="flex flex-row flex-nowrap gap-4 ml-auto items-center">

@@ -1,4 +1,3 @@
-import { useGame } from "@/hooks/use-game";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -6,7 +5,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "./ui/alert-dialog";
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { setNickSchema } from "@/lib/schemas";
@@ -16,9 +15,7 @@ import { Button } from "./ui/button";
 import { useSocket } from "@/hooks/use-socket";
 
 export function Nickname() {
-  const { setNickname, connected } = useSocket();
-  const { nickname } = useGame();
-  const [open, setOpen] = useState(false);
+  const { nickname, setNickname, sayHello, connected } = useSocket();
 
   const form = useForm<z.infer<typeof setNickSchema>>({
     resolver: zodResolver(setNickSchema),
@@ -28,14 +25,19 @@ export function Nickname() {
     },
   });
 
-  useEffect(() => {
-    if (nickname === "" && connected) {
-      setOpen(true);
+  const open = useMemo(() => {
+    if (!connected) {
+      return false;
     }
+    if (nickname === "") {
+      return true;
+    }
+
+    return false;
   }, [connected, nickname]);
 
   return (
-    <AlertDialog open={open} onOpenChange={setOpen}>
+    <AlertDialog open={open}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Nickname</AlertDialogTitle>
@@ -47,7 +49,7 @@ export function Nickname() {
           className="w-full space-y-4"
           onSubmit={form.handleSubmit((data) => {
             setNickname(data.nickname);
-            setOpen(false);
+            sayHello();
           })}
         >
           <Input

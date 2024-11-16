@@ -10,23 +10,12 @@ import { Input } from "@/components/ui/input";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "./ui/button";
-import { useEffect, useState } from "react";
-import { createGameSchema, enterGameSchama } from "@/lib/schemas";
+import { useMemo } from "react";
+import { createGameSchema } from "@/lib/schemas";
 import { useSocket } from "@/hooks/use-socket";
-import { useMutation } from "@tanstack/react-query";
-import { api } from "@/lib/api";
-import { useGame } from "@/hooks/use-game";
 
 export function EnterGame() {
-  const { gameId, joinGame } = useSocket();
-  const { uuid } = useGame();
-  const [open, setOpen] = useState(false);
-  const enterForm = useForm<z.infer<typeof enterGameSchama>>({
-    resolver: zodResolver(enterGameSchama),
-    defaultValues: {
-      gameId: "",
-    },
-  });
+  const { createGame, game, games, nickname, joinGame } = useSocket();
   const form = useForm<z.infer<typeof createGameSchema>>({
     resolver: zodResolver(createGameSchema),
     defaultValues: {
@@ -34,63 +23,65 @@ export function EnterGame() {
     },
   });
 
-  useEffect(() => {
-    if (gameId === null) {
-      setOpen(true);
-    } else {
-      setOpen(false);
+  const open = useMemo(() => {
+    if (nickname === "") {
+      return false;
     }
-  }, [gameId]);
 
-  const createGame = useMutation({
-    async mutationFn(data: z.infer<typeof createGameSchema>) {
-      const { id } = await api.createGame(data.name, uuid);
-      joinGame(id);
-    },
-  });
+    if (game === null) {
+      return true;
+    }
+    return false;
+  }, [nickname, game]);
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent>
+    <Dialog open={open}>
+      <DialogContent
+        hideClose
+        className="h-full max-h-[80vh] min-w-[80vw] min-h-[80vh]"
+      >
         <DialogHeader>
           <DialogTitle>Spiel beitreten</DialogTitle>
           <DialogDescription>
-            Gib die ID des Spiels ein, dem du beitreten möchtest, oder erstelle
-            ein neues Spiel
+            Trete einem Spiel bei oder erstelle ein neues
           </DialogDescription>
         </DialogHeader>
-        <form
-          onSubmit={enterForm.handleSubmit((data) => {
-            joinGame(data.gameId);
-          })}
-          className="space-y-4 w-full"
-        >
-          <Input
-            control={enterForm.control}
-            name="gameId"
-            placeholder="GAME ID"
-            label="Game ID"
-          />
-          <div className="flex flex-row flex-nowrap justify-end">
-            <Button type="submit">Beitreten</Button>
+        <div className="w-full grid grid-cols-3 gap-8 h-full">
+          <div className="col-span-2 flex flex-col h-full gap-4">
+            <p className="font-bold">Spiele</p>
+            <ul className="h-full overflow-y-auto">
+              {games.map((game) => (
+                <li
+                  key={game.id}
+                  className="rounded-lg border-2 p-4 hover:bg-secondary cursor-pointer"
+                  onClick={() => {
+                    joinGame(game.id);
+                  }}
+                >
+                  {game.name}
+                </li>
+              ))}
+            </ul>
           </div>
-        </form>
-        <form
-          className="w-full space-y-4"
-          onSubmit={form.handleSubmit(async (data) => {
-            await createGame.mutateAsync(data);
-          })}
-        >
-          <Input
-            placeholder="Name eingeben"
-            control={form.control}
-            name="name"
-            label="Name des neuen Spiels"
-          />
-          <div className="flex flex-row flex-nowrap justify-end">
-            <Button type="submit">Erstellen</Button>
+          <div className="col-span-1 flex flex-col gap-4">
+            <p className="font-bold">Neues Spiel erstellen</p>
+            <form
+              className="flex flex-col gap-4 w-full"
+              onSubmit={form.handleSubmit(async (data) => {
+                createGame(data.name);
+              })}
+            >
+              <Input
+                placeholder="Name eingeben"
+                control={form.control}
+                name="name"
+              />
+              <div className="flex flex-row flex-nowrap justify-end">
+                <Button type="submit">Erstellen</Button>
+              </div>
+            </form>
           </div>
-        </form>
+        </div>
       </DialogContent>
     </Dialog>
   );
