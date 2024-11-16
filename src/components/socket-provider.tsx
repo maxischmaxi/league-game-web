@@ -72,6 +72,25 @@ function getGame() {
   ws.send(JSON.stringify(data));
 }
 
+function sayHello() {
+  const name = localStorage.getItem("nickname");
+  if (!name) {
+    return;
+  }
+
+  const uuid = localStorage.getItem("uuid");
+
+  const data: SocketMessage = {
+    type: SocketMessageType.SAY_HELLO,
+    payload: JSON.stringify({
+      name,
+      uuid: uuid ?? "",
+    }),
+  };
+
+  ws.send(JSON.stringify(data));
+}
+
 export function SockerProvider({ children }: { children: ReactNode }) {
   const [uuid, setUuid] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
@@ -98,6 +117,10 @@ export function SockerProvider({ children }: { children: ReactNode }) {
     const nickItem = localStorage.getItem("nickname");
     if (nickItem) {
       setNickname(nickItem);
+    }
+
+    if (connected && nickItem && !uuidItem) {
+      sayHello();
     }
   }, [connected, nickname]);
 
@@ -344,23 +367,6 @@ export function SockerProvider({ children }: { children: ReactNode }) {
       payload: JSON.stringify({
         gameId,
         preview,
-      }),
-    };
-
-    ws.send(JSON.stringify(data));
-  }
-
-  function sayHello() {
-    const name = localStorage.getItem("nickname");
-    if (!name) {
-      return;
-    }
-
-    const data: SocketMessage = {
-      type: SocketMessageType.SAY_HELLO,
-      payload: JSON.stringify({
-        name,
-        uuid: uuid ?? "",
       }),
     };
 
