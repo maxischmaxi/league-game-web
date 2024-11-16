@@ -13,28 +13,18 @@ import { ReactNode, useEffect, useState } from "react";
 const ws = new WebSocket(`${gateway}/ws`);
 
 function getRounds() {
-  const gameId = localStorage.getItem("game-id");
-  if (!gameId) {
-    return;
-  }
-
   const data: SocketMessage = {
     type: SocketMessageType.GET_ROUNDS,
-    payload: gameId,
+    payload: "",
   };
 
   ws.send(JSON.stringify(data));
 }
 
 function getRound() {
-  const gameId = localStorage.getItem("game-id");
-  if (!gameId) {
-    return;
-  }
-
   const data: SocketMessage = {
     type: SocketMessageType.GET_ROUND,
-    payload: gameId,
+    payload: "",
   };
 
   ws.send(JSON.stringify(data));
@@ -67,27 +57,17 @@ function joinGame(gameId: string) {
 }
 
 function getCurrentText() {
-  const gameId = localStorage.getItem("game-id");
-  if (!gameId) {
-    return;
-  }
-
   const data: SocketMessage = {
     type: SocketMessageType.GET_TEXT,
-    payload: gameId,
+    payload: "",
   };
   ws.send(JSON.stringify(data));
 }
 
 function getGame() {
-  const gameId = localStorage.getItem("game-id");
-  if (!gameId) {
-    return;
-  }
-
   const data: SocketMessage = {
     type: SocketMessageType.GET_GAME,
-    payload: gameId,
+    payload: "",
   };
   ws.send(JSON.stringify(data));
 }
@@ -119,11 +99,7 @@ export function SockerProvider({ children }: { children: ReactNode }) {
     if (nickItem) {
       setNickname(nickItem);
     }
-
-    if (connected && uuid && nickname) {
-      sayHello();
-    }
-  }, [connected, nickname, uuid]);
+  }, [connected, nickname]);
 
   useEffect(() => {
     function onConnect() {
@@ -146,7 +122,6 @@ export function SockerProvider({ children }: { children: ReactNode }) {
     function onError() {
       console.log("error");
       close();
-      localStorage.removeItem("game-id");
     }
 
     function onMessage(event: MessageEvent) {
@@ -224,8 +199,7 @@ export function SockerProvider({ children }: { children: ReactNode }) {
           break;
         case SocketMessageType.CREATE_GAME: {
           const game = JSON.parse(data.payload as string) as Game;
-          localStorage.setItem("game-id", game.id);
-
+          setGame(game);
           getRound();
           getRounds();
           getAllGames();
@@ -239,14 +213,11 @@ export function SockerProvider({ children }: { children: ReactNode }) {
           break;
         case SocketMessageType.JOIN_GAME: {
           if (data.payload === "false") {
-            localStorage.removeItem("game-id");
             setGame(null);
             return;
           }
 
           const game = JSON.parse(data.payload as string) as Game;
-
-          localStorage.setItem("game-id", game.id);
           setGame(game);
           getAllGames();
           getConnectedPlayers();
@@ -318,16 +289,13 @@ export function SockerProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const gameId = localStorage.getItem("game-id");
-    if (!gameId) {
+    if (!game) {
       return;
     }
 
-    localStorage.removeItem("game-id");
-
     const data: SocketMessage = {
       type: SocketMessageType.LEAVE_GAME,
-      payload: gameId,
+      payload: game.id,
     };
 
     ws.send(JSON.stringify(data));
@@ -388,15 +356,14 @@ export function SockerProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const uuid = localStorage.getItem("uuid");
-
     const data: SocketMessage = {
       type: SocketMessageType.SAY_HELLO,
       payload: JSON.stringify({
         name,
-        uuid,
+        uuid: uuid ?? "",
       }),
     };
+
     ws.send(JSON.stringify(data));
   }
 
