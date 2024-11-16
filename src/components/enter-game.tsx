@@ -49,7 +49,7 @@ export function EnterGame() {
         <div className="w-full grid grid-cols-3 gap-8 h-full">
           <div className="col-span-2 flex flex-col h-full gap-4">
             <p className="font-bold">Spiele</p>
-            <ul className="h-full overflow-y-auto">
+            <ul className="h-full overflow-y-auto flex flex-col gap-2">
               {games.map((game) => (
                 <li
                   key={game.id}

@@ -1,5 +1,4 @@
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { useSocket } from "@/hooks/use-socket";
 import { useMemo, useState } from "react";
@@ -13,17 +12,8 @@ export function GamePlayerView() {
     setAnswer,
     uuid,
     currentText,
-    previewed,
   } = useSocket();
   const [text, setText] = useState("");
-
-  const isPreviewed = useMemo(() => {
-    if (!game) {
-      return false;
-    }
-
-    return previewed.includes(game.id);
-  }, [game, previewed]);
 
   const myAnswer = useMemo(() => {
     if (!game) {
@@ -119,12 +109,6 @@ export function GamePlayerView() {
           )}
         </>
       )}
-
-      <Dialog open={isPreviewed}>
-        <DialogContent hideClose className="w-[80vw] h-[80vh]">
-          <p></p>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

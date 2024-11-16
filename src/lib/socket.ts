@@ -8,7 +8,6 @@ type IUseSocket = {
   allAnswers: Answer[];
   nickname: string;
   uuid: string | null;
-  previewed: string[];
   games: Game[];
   round: GameRound | null;
   rounds: GameRound[];
@@ -22,8 +21,8 @@ type IUseSocket = {
   leaveGame: () => void;
   setAnswerVisible: (uuid: string) => void;
   setAnswerInvisible: (uuid: string) => void;
-  setPreview: (gameId: string, preview: boolean) => void;
   sayHello: () => void;
+  deleteGame: (gameId: string) => void;
   createGame: (name: string) => void;
   goNextRound: () => void;
   startRound: () => void;
@@ -31,9 +30,9 @@ type IUseSocket = {
 };
 
 export const SocketContext = createContext<IUseSocket>({
+  deleteGame: () => null,
   connected: false,
   game: null,
-  previewed: [],
   games: [],
   round: null,
   currentText: "",
@@ -48,7 +47,6 @@ export const SocketContext = createContext<IUseSocket>({
   createGame: () => null,
   startRound: () => null,
   sayHello: () => null,
-  setPreview: () => null,
   reconnect: () => null,
   setNickname: () => null,
   setText: () => null,

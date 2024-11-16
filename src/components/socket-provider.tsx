@@ -1,3 +1,4 @@
+import { toast } from "sonner";
 import {
   Answer,
   Game,
@@ -91,12 +92,22 @@ function sayHello() {
   ws.send(JSON.stringify(data));
 }
 
+function deleteGame(gameId: string) {
+  const data: SocketMessage = {
+    type: SocketMessageType.DELETE_GAME,
+    payload: gameId,
+  };
+
+  ws.send(JSON.stringify(data));
+}
+
 export function SockerProvider({ children }: { children: ReactNode }) {
   const [uuid, setUuid] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
-  const [nickname, setNickname] = useState("");
+  const [nickname, setNickname] = useState(
+    localStorage.getItem("nickname") ?? "",
+  );
   const [round, setRound] = useState<GameRound | null>(null);
-  const [previewed, setPreviewed] = useState<string[]>([]);
   const [allAnswers, setAllAnswers] = useState<Answer[]>([]);
   const [game, setGame] = useState<Game | null>(null);
   const [currentText, setCurrentText] = useState("");
@@ -118,15 +129,16 @@ export function SockerProvider({ children }: { children: ReactNode }) {
     if (nickItem) {
       setNickname(nickItem);
     }
-
-    if (connected && nickItem && !uuidItem) {
-      sayHello();
-    }
-  }, [connected, nickname]);
+  }, [connected]);
 
   useEffect(() => {
     function onConnect() {
       setConnected(true);
+
+      console.log("onConnect", nickname);
+      if (nickname) {
+        sayHello();
+      }
     }
 
     function close() {
@@ -171,11 +183,9 @@ export function SockerProvider({ children }: { children: ReactNode }) {
           setConnectedPlayers((prev) =>
             prev.filter((x) => x.id !== disconnectedPlayer.id),
           );
+          toast(`${disconnectedPlayer.nickname} hat das Spiel verlassen`);
           break;
         }
-        case SocketMessageType.PREVIEWED_GAMES:
-          setPreviewed(JSON.parse(data.payload as string));
-          break;
         case SocketMessageType.ALL_ANSWERS:
           setAllAnswers(JSON.parse(data.payload as string));
           break;
@@ -188,6 +198,7 @@ export function SockerProvider({ children }: { children: ReactNode }) {
           break;
         case SocketMessageType.GET_ROUND:
           setRound(JSON.parse(data.payload as string));
+          toast("Eine neue Runde wurde gestartet");
           break;
         case SocketMessageType.GET_ROUNDS:
           setRounds(JSON.parse(data.payload as string));
@@ -202,10 +213,12 @@ export function SockerProvider({ children }: { children: ReactNode }) {
 
             return prev;
           });
+          toast(`${connectedPlayer.nickname} hat das Spiel betreten`);
           break;
         }
         case SocketMessageType.SET_TEXT: {
           setCurrentText(data.payload as string);
+          toast("Ein neuer Text wurde gesetzt");
           break;
         }
         case SocketMessageType.SET_NICK_SUCCESS:
@@ -214,11 +227,13 @@ export function SockerProvider({ children }: { children: ReactNode }) {
           break;
         case SocketMessageType.GET_GAME:
           setGame(JSON.parse(data.payload as string));
+          toast("Du bist dem Spiel beigetreten");
           break;
         case SocketMessageType.LEAVE_GAME:
           setConnectedPlayers((prev) =>
             prev.filter((user) => user.id !== data.payload),
           );
+          toast("Du hast das Spiel verlassen");
           break;
         case SocketMessageType.CREATE_GAME: {
           const game = JSON.parse(data.payload as string) as Game;
@@ -226,6 +241,21 @@ export function SockerProvider({ children }: { children: ReactNode }) {
           getRound();
           getRounds();
           getAllGames();
+          toast("Ein neues Spiel wurde erstellt");
+          break;
+        }
+        case SocketMessageType.GAME_DELETED: {
+          const id = data.payload as string;
+          if (game !== null && game.id === id) {
+            setGame(null);
+            setRound(null);
+            setAllAnswers([]);
+            setCurrentText("");
+            setConnectedPlayers([]);
+            setRounds([]);
+            setGames([]);
+            toast("Das Spiel wurde gelöscht");
+          }
           break;
         }
         case SocketMessageType.ERROR:
@@ -248,6 +278,9 @@ export function SockerProvider({ children }: { children: ReactNode }) {
           getRound();
           getRounds();
           getGame();
+
+          toast("Du bist dem Spiel beigetreten");
+
           break;
         }
         default:
@@ -361,18 +394,6 @@ export function SockerProvider({ children }: { children: ReactNode }) {
     ws.send(JSON.stringify(data));
   }
 
-  function setPreview(gameId: string, preview: boolean) {
-    const data: SocketMessage = {
-      type: SocketMessageType.SET_PREVIEW,
-      payload: JSON.stringify({
-        gameId,
-        preview,
-      }),
-    };
-
-    ws.send(JSON.stringify(data));
-  }
-
   function createGame(name: string) {
     const data: SocketMessage = {
       type: SocketMessageType.CREATE_GAME,
@@ -465,9 +486,7 @@ export function SockerProvider({ children }: { children: ReactNode }) {
         rounds,
         connected,
         games,
-        setPreview,
         setAnswerInvisible,
-        previewed,
         setAnswerVisible,
         reconnect,
         leaveGame,
@@ -481,6 +500,7 @@ export function SockerProvider({ children }: { children: ReactNode }) {
         currentText,
         setText,
         setAnswer,
+        deleteGame,
         allAnswers,
       }}
     >
