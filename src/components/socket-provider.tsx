@@ -108,6 +108,10 @@ export function SockerProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const uuidItem = localStorage.getItem("uuid");
     if (uuidItem) {
+      if (uuidItem.includes("-")) {
+        localStorage.removeItem("uuid");
+        return;
+      }
       setUuid(uuidItem);
     }
 
