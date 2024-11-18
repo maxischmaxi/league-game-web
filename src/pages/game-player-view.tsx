@@ -1,10 +1,26 @@
-import { ConnectionIndicator } from "@/components/connection-indicator";
-import { motion, Variants } from "framer-motion";
+import type { Variants } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { useSocket } from "@/hooks/use-socket";
-import { ChangeEvent, useMemo, useRef, useState } from "react";
+import { ChangeEvent, lazy, useMemo, useRef, useState } from "react";
 import { websocket } from "@/lib/websocket";
+
+const Li = lazy(() =>
+  import("framer-motion").then((mod) => ({
+    default: mod.motion.li,
+  })),
+);
+
+const Textarea = lazy(() =>
+  import("@/components/ui/textarea").then((mod) => ({
+    default: mod.Textarea,
+  })),
+);
+
+const ConnectionIndicator = lazy(() =>
+  import("@/components/connection-indicator").then((mod) => ({
+    default: mod.ConnectionIndicator,
+  })),
+);
 
 const variants: Variants = {
   hidden: {
@@ -88,7 +104,7 @@ export function GamePlayerView() {
               return 0;
             })
             .map((r) => (
-              <motion.li
+              <Li
                 className="bg-white/20 p-4 rounded-lg min-w-[400px] max-w-[800px]"
                 key={r.round}
                 variants={variants}
@@ -132,7 +148,7 @@ export function GamePlayerView() {
                     </div>
                   </>
                 )}
-              </motion.li>
+              </Li>
             ))}
         </ul>
         <div className="bg-white rounded-lg p-4 min-w-[400px] max-w-[800px]">

@@ -1,13 +1,22 @@
-import { ConnectionIndicator } from "@/components/connection-indicator";
-import { DeleteGame } from "@/components/delete-game";
-import { ModeToggle } from "@/components/mode-toggle";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useSocket } from "@/hooks/use-socket";
 import { cn } from "@/lib/utils";
 import { websocket } from "@/lib/websocket";
 import { Eye, EyeOff, Plus, Trash } from "lucide-react";
-import { useState } from "react";
+import { lazy, useState } from "react";
+
+const DeleteGame = lazy(() =>
+  import("@/components/delete-game").then((mod) => ({
+    default: mod.DeleteGame,
+  })),
+);
+
+const ConnectionIndicator = lazy(() =>
+  import("@/components/connection-indicator").then((mod) => ({
+    default: mod.ConnectionIndicator,
+  })),
+);
 
 export function GameManagerView() {
   const { allAnswers, connectedPlayers, game, currentText, rounds } =
@@ -32,7 +41,6 @@ export function GameManagerView() {
             Spiel verlassen
           </Button>
           <DeleteGame />
-          <ModeToggle />
           <ConnectionIndicator />
         </div>
       </div>
