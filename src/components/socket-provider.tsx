@@ -1,105 +1,14 @@
-import { toast } from "sonner";
 import {
   Answer,
   Game,
-  gateway,
   Player,
   GameRound,
-  SocketMessage,
   SocketMessageType,
+  gateway,
 } from "@/lib/definitions";
 import { SocketContext } from "@/lib/socket";
 import { ReactNode, useEffect, useState } from "react";
-
-const ws = new WebSocket(`${gateway}/ws`);
-
-function getRounds() {
-  const data: SocketMessage = {
-    type: SocketMessageType.GET_ROUNDS,
-    payload: "",
-  };
-
-  ws.send(JSON.stringify(data));
-}
-
-function getRound() {
-  const data: SocketMessage = {
-    type: SocketMessageType.GET_ROUND,
-    payload: "",
-  };
-
-  ws.send(JSON.stringify(data));
-}
-
-function getConnectedPlayers() {
-  const data: SocketMessage = {
-    type: SocketMessageType.GET_CONNECTED_PLAYERS,
-    payload: "",
-  };
-
-  ws.send(JSON.stringify(data));
-}
-
-function getAllGames() {
-  const data: SocketMessage = {
-    type: SocketMessageType.GET_GAMES,
-    payload: "",
-  };
-
-  ws.send(JSON.stringify(data));
-}
-
-function joinGame(gameId: string) {
-  const data: SocketMessage = {
-    type: SocketMessageType.JOIN_GAME,
-    payload: gameId,
-  };
-  ws.send(JSON.stringify(data));
-}
-
-function getCurrentText() {
-  const data: SocketMessage = {
-    type: SocketMessageType.GET_TEXT,
-    payload: "",
-  };
-  ws.send(JSON.stringify(data));
-}
-
-function getGame() {
-  const data: SocketMessage = {
-    type: SocketMessageType.GET_GAME,
-    payload: "",
-  };
-  ws.send(JSON.stringify(data));
-}
-
-function sayHello() {
-  const name = localStorage.getItem("nickname");
-  if (!name) {
-    return;
-  }
-
-  const uuid = localStorage.getItem("uuid");
-
-  const data: SocketMessage = {
-    type: SocketMessageType.SAY_HELLO,
-    payload: JSON.stringify({
-      name,
-      uuid: uuid ?? "",
-    }),
-  };
-
-  ws.send(JSON.stringify(data));
-}
-
-function deleteGame(gameId: string) {
-  const data: SocketMessage = {
-    type: SocketMessageType.DELETE_GAME,
-    payload: gameId,
-  };
-
-  ws.send(JSON.stringify(data));
-}
+import { websocket } from "@/lib/websocket";
 
 export function SockerProvider({ children }: { children: ReactNode }) {
   const [uuid, setUuid] = useState<string | null>(null);
@@ -107,7 +16,6 @@ export function SockerProvider({ children }: { children: ReactNode }) {
   const [nickname, setNickname] = useState(
     localStorage.getItem("nickname") ?? "",
   );
-  const [round, setRound] = useState<GameRound | null>(null);
   const [allAnswers, setAllAnswers] = useState<Answer[]>([]);
   const [game, setGame] = useState<Game | null>(null);
   const [currentText, setCurrentText] = useState("");
@@ -118,30 +26,129 @@ export function SockerProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const uuidItem = localStorage.getItem("uuid");
     if (uuidItem) {
-      if (uuidItem.includes("-")) {
+      if (!uuidItem.includes("-")) {
         localStorage.removeItem("uuid");
+        document.cookie = "uuid=; SameSite=Strict; Secure;";
         return;
       }
       setUuid(uuidItem);
+      document.cookie = `uuid=${uuidItem}; SameSite=Strict; Secure;`;
     }
 
     const nickItem = localStorage.getItem("nickname");
     if (nickItem) {
       setNickname(nickItem);
     }
-  }, [connected]);
+  }, []);
 
   useEffect(() => {
-    function onConnect() {
-      setConnected(true);
+    if (nickname.length > 0 && !websocket.connected && !websocket.connecting) {
+      websocket.init(`${gateway}/ws`);
+    }
 
-      console.log("onConnect", nickname);
+    function onNickRequest() {
       if (nickname) {
-        sayHello();
+        websocket.setNick(nickname);
+      }
+
+      if (game !== null) {
+        websocket.joinGame(game.id);
       }
     }
 
-    function close() {
+    function onPlayerDisconnected(payload: string | object) {
+      const disconnectedPlayer = JSON.parse(payload as string) as Player;
+      setConnectedPlayers((prev) =>
+        prev.filter((x) => x.id !== disconnectedPlayer.id),
+      );
+    }
+
+    function onAllAnswers(payload: string | object) {
+      setAllAnswers(JSON.parse(payload as string));
+    }
+
+    function onSetUuid(payload: string | object) {
+      localStorage.setItem("uuid", payload as string);
+      document.cookie = `uuid=${payload}; SameSite=Strict; Secure;`;
+      setUuid(payload as string);
+    }
+
+    function onGetGames(payload: string | object) {
+      setGames(JSON.parse(payload as string));
+    }
+
+    function onGetRounds(payload: string | object) {
+      setRounds(JSON.parse(payload as string));
+    }
+
+    function onPlayerConnected(payload: string | object) {
+      const connectedPlayer = JSON.parse(payload as string) as Player;
+      setConnectedPlayers((prev) => {
+        const index = prev.findIndex((x) => x.id === connectedPlayer.id);
+        if (index === -1) {
+          return [...prev, connectedPlayer];
+        }
+
+        return prev;
+      });
+    }
+
+    function onSetText(payload: string | object) {
+      setCurrentText(payload as string);
+    }
+
+    function onSetNickSuccess(payload: string | object) {
+      localStorage.setItem("nickname", payload as string);
+      setNickname(payload as string);
+    }
+
+    function onGetGame(payload: string | object) {
+      setGame(JSON.parse(payload as string));
+    }
+
+    function onLeaveGame(payload: string | object) {
+      setConnectedPlayers((prev) => prev.filter((user) => user.id !== payload));
+    }
+
+    function onGameDeleted(payload: string | object) {
+      const id = payload as string;
+      if (game !== null && game.id === id) {
+        setGame(null);
+        setAllAnswers([]);
+        setCurrentText("");
+        setConnectedPlayers([]);
+        setRounds([]);
+        setGames([]);
+      }
+    }
+
+    function onGetConnectedPlayers(payload: string | object) {
+      setConnectedPlayers(JSON.parse(payload as string));
+    }
+
+    function onJoinGame(payload: string | object) {
+      if (payload === "false") {
+        setGame(null);
+        return;
+      }
+
+      const game = JSON.parse(payload as string) as Game;
+      setGame(game);
+      websocket.getAllGames();
+      websocket.getConnectedPlayers();
+      websocket.getCurrentText();
+      websocket.getRounds();
+      websocket.getGame();
+    }
+
+    function onOpen() {
+      setConnected(true);
+      if (nickname) {
+        websocket.sayHello();
+      }
+    }
+
+    function onClose() {
       setConnected(false);
       setGame(null);
       setAllAnswers([]);
@@ -149,358 +156,88 @@ export function SockerProvider({ children }: { children: ReactNode }) {
       setConnectedPlayers([]);
     }
 
-    function onDisconnect() {
-      console.log("disconnected");
-      close();
+    function onGameLeft() {
+      setGame(null);
+      setAllAnswers([]);
+      setCurrentText("");
+      setConnectedPlayers([]);
+      setRounds([]);
+      setGames([]);
     }
 
-    function onError() {
-      console.log("error");
-      close();
-    }
-
-    function onMessage(event: MessageEvent) {
-      const data = JSON.parse(event.data) as SocketMessage;
-      switch (data.type) {
-        case SocketMessageType.NICK_REQUEST:
-          if (nickname) {
-            const data: SocketMessage = {
-              type: SocketMessageType.SET_NICK,
-              payload: nickname,
-            };
-
-            ws.send(JSON.stringify(data));
-          }
-
-          if (game !== null) {
-            joinGame(game.id);
-          }
-          break;
-        case SocketMessageType.PLAYER_DISCONNECTED: {
-          const disconnectedPlayer = JSON.parse(
-            data.payload as string,
-          ) as Player;
-          setConnectedPlayers((prev) =>
-            prev.filter((x) => x.id !== disconnectedPlayer.id),
-          );
-          toast(`${disconnectedPlayer.nickname} hat das Spiel verlassen`);
-          break;
-        }
-        case SocketMessageType.ALL_ANSWERS:
-          setAllAnswers(JSON.parse(data.payload as string));
-          break;
-        case SocketMessageType.SET_UUID:
-          localStorage.setItem("uuid", data.payload as string);
-          setUuid(data.payload as string);
-          break;
-        case SocketMessageType.GET_GAMES:
-          setGames(JSON.parse(data.payload as string));
-          break;
-        case SocketMessageType.GET_ROUND:
-          setRound(JSON.parse(data.payload as string));
-          toast("Eine neue Runde wurde gestartet");
-          break;
-        case SocketMessageType.GET_ROUNDS:
-          setRounds(JSON.parse(data.payload as string));
-          break;
-        case SocketMessageType.PLAYER_CONNECTED: {
-          const connectedPlayer = JSON.parse(data.payload as string) as Player;
-          setConnectedPlayers((prev) => {
-            const index = prev.findIndex((x) => x.id === connectedPlayer.id);
-            if (index === -1) {
-              return [...prev, connectedPlayer];
-            }
-
-            return prev;
-          });
-          toast(`${connectedPlayer.nickname} hat das Spiel betreten`);
-          break;
-        }
-        case SocketMessageType.SET_TEXT: {
-          setCurrentText(data.payload as string);
-          toast("Ein neuer Text wurde gesetzt");
-          break;
-        }
-        case SocketMessageType.SET_NICK_SUCCESS:
-          localStorage.setItem("nickname", data.payload as string);
-          setNickname(data.payload as string);
-          break;
-        case SocketMessageType.GET_GAME:
-          setGame(JSON.parse(data.payload as string));
-          toast("Du bist dem Spiel beigetreten");
-          break;
-        case SocketMessageType.LEAVE_GAME:
-          setConnectedPlayers((prev) =>
-            prev.filter((user) => user.id !== data.payload),
-          );
-          toast("Du hast das Spiel verlassen");
-          break;
-        case SocketMessageType.CREATE_GAME: {
-          const game = JSON.parse(data.payload as string) as Game;
-          setGame(game);
-          getRound();
-          getRounds();
-          getAllGames();
-          toast("Ein neues Spiel wurde erstellt");
-          break;
-        }
-        case SocketMessageType.GAME_DELETED: {
-          const id = data.payload as string;
-          if (game !== null && game.id === id) {
-            setGame(null);
-            setRound(null);
-            setAllAnswers([]);
-            setCurrentText("");
-            setConnectedPlayers([]);
-            setRounds([]);
-            setGames([]);
-            toast("Das Spiel wurde gelöscht");
-          }
-          break;
-        }
-        case SocketMessageType.ERROR:
-          console.error(data.payload);
-          break;
-        case SocketMessageType.GET_CONNECTED_PLAYERS:
-          setConnectedPlayers(JSON.parse(data.payload as string));
-          break;
-        case SocketMessageType.JOIN_GAME: {
-          if (data.payload === "false") {
-            setGame(null);
-            return;
-          }
-
-          const game = JSON.parse(data.payload as string) as Game;
-          setGame(game);
-          getAllGames();
-          getConnectedPlayers();
-          getCurrentText();
-          getRound();
-          getRounds();
-          getGame();
-
-          toast("Du bist dem Spiel beigetreten");
-
-          break;
-        }
-        default:
-          break;
-      }
-    }
-
-    ws.addEventListener("open", onConnect);
-    ws.addEventListener("close", onDisconnect);
-    ws.addEventListener("error", onError);
-    ws.addEventListener("message", onMessage);
+    websocket.on("open", onOpen);
+    websocket.on("closed", onClose);
+    websocket.on("error", onClose);
+    websocket.on("gameLeft", onGameLeft);
+    websocket.on(SocketMessageType.GET_GAME, onGetGame);
+    websocket.on(SocketMessageType.GAME_DELETED, onGameDeleted);
+    websocket.on(
+      SocketMessageType.GET_CONNECTED_PLAYERS,
+      onGetConnectedPlayers,
+    );
+    websocket.on(SocketMessageType.JOIN_GAME, onJoinGame);
+    websocket.on(SocketMessageType.LEAVE_GAME, onLeaveGame);
+    websocket.on(SocketMessageType.SET_NICK_SUCCESS, onSetNickSuccess);
+    websocket.on(SocketMessageType.SET_TEXT, onSetText);
+    websocket.on(SocketMessageType.PLAYER_CONNECTED, onPlayerConnected);
+    websocket.on(SocketMessageType.GET_ROUNDS, onGetRounds);
+    websocket.on(SocketMessageType.GET_GAMES, onGetGames);
+    websocket.on(SocketMessageType.ALL_ANSWERS, onAllAnswers);
+    websocket.on(SocketMessageType.PLAYER_DISCONNECTED, onPlayerDisconnected);
+    websocket.on(SocketMessageType.SET_UUID, onSetUuid);
+    websocket.on(SocketMessageType.NICK_REQUEST, onNickRequest);
 
     return () => {
-      ws.removeEventListener("open", onConnect);
-      ws.removeEventListener("close", onDisconnect);
-      ws.removeEventListener("error", onError);
-      ws.removeEventListener("message", onMessage);
+      websocket.off("open", onOpen);
+      websocket.off("closed", onClose);
+      websocket.off("error", onClose);
+      websocket.off("gameLeft", onGameLeft);
+      websocket.off(SocketMessageType.JOIN_GAME, onJoinGame);
+      websocket.off(
+        SocketMessageType.GET_CONNECTED_PLAYERS,
+        onGetConnectedPlayers,
+      );
+      websocket.off(SocketMessageType.GAME_DELETED, onGameDeleted);
+      websocket.off(SocketMessageType.LEAVE_GAME, onLeaveGame);
+      websocket.off(SocketMessageType.GET_GAME, onGetGame);
+      websocket.off(SocketMessageType.SET_NICK_SUCCESS, onSetNickSuccess);
+      websocket.off(SocketMessageType.SET_TEXT, onSetText);
+      websocket.off(SocketMessageType.PLAYER_CONNECTED, onPlayerConnected);
+      websocket.off(SocketMessageType.GET_ROUNDS, onGetRounds);
+      websocket.off(SocketMessageType.GET_GAMES, onGetGames);
+      websocket.off(SocketMessageType.ALL_ANSWERS, onAllAnswers);
+      websocket.off(
+        SocketMessageType.PLAYER_DISCONNECTED,
+        onPlayerDisconnected,
+      );
+      websocket.off(SocketMessageType.SET_UUID, onSetUuid);
+      websocket.off(SocketMessageType.NICK_REQUEST, onNickRequest);
     };
-  }, [game, nickname, uuid]);
+  }, [connected, game, nickname]);
 
   function setNick(nickname: string) {
     localStorage.setItem("nickname", nickname);
     setNickname(nickname);
   }
 
-  function setText(message: string) {
-    if (!connected) {
-      return;
-    }
-
-    if (!game) {
-      return;
-    }
-
-    if (!round) {
-      return;
-    }
-
-    const data: SocketMessage = {
-      type: SocketMessageType.SET_TEXT,
-      payload: message,
-    };
-
-    ws.send(JSON.stringify(data));
-  }
-
-  function setAnswer(answer: string) {
-    if (!connected) {
-      return;
-    }
-
-    const data: SocketMessage = {
-      type: SocketMessageType.SET_ANSWER,
-      payload: answer,
-    };
-
-    ws.send(JSON.stringify(data));
-  }
-
-  function leaveGame() {
-    if (!connected) {
-      return;
-    }
-
-    if (!game) {
-      return;
-    }
-
-    const data: SocketMessage = {
-      type: SocketMessageType.LEAVE_GAME,
-      payload: game.id,
-    };
-
-    ws.send(JSON.stringify(data));
-    setGame(null);
-    setRound(null);
-    setAllAnswers([]);
-    setCurrentText("");
-    setConnectedPlayers([]);
-    setRounds([]);
-    setGames([]);
-  }
-
   function reconnect() {
     window.location.reload();
-  }
-
-  function setAnswerVisible(answerId: string) {
-    if (!connected) {
-      return;
-    }
-
-    if (!game) {
-      return;
-    }
-
-    const data: SocketMessage = {
-      type: SocketMessageType.SET_ANSWER_VISIBLE,
-      payload: answerId,
-    };
-
-    ws.send(JSON.stringify(data));
-  }
-
-  function setAnswerInvisible(uuid: string) {
-    const data: SocketMessage = {
-      type: SocketMessageType.SET_ANSWER_INVISIBLE,
-      payload: uuid,
-    };
-
-    ws.send(JSON.stringify(data));
-  }
-
-  function createGame(name: string) {
-    const data: SocketMessage = {
-      type: SocketMessageType.CREATE_GAME,
-      payload: name,
-    };
-
-    ws.send(JSON.stringify(data));
-  }
-
-  function goNextRound() {
-    if (!game) {
-      return;
-    }
-
-    if (!round) {
-      return;
-    }
-
-    const data: SocketMessage = {
-      type: SocketMessageType.GO_NEXT_ROUND,
-      payload: JSON.stringify({
-        gameId: game.id,
-        roundId: round.id,
-      }),
-    };
-
-    ws.send(JSON.stringify(data));
-  }
-
-  function endRound() {
-    if (!game) {
-      return;
-    }
-
-    if (!round) {
-      return;
-    }
-
-    if (round.ended) {
-      return;
-    }
-
-    const data: SocketMessage = {
-      type: SocketMessageType.END_ROUND,
-      payload: "",
-    };
-
-    ws.send(JSON.stringify(data));
-  }
-
-  function startRound() {
-    if (!game) {
-      return;
-    }
-
-    if (!round) {
-      return;
-    }
-
-    if (round.started) {
-      return;
-    }
-
-    const data: SocketMessage = {
-      type: SocketMessageType.START_ROUND,
-      payload: "",
-    };
-
-    ws.send(JSON.stringify(data));
-  }
-
-  function deleteAnswer(answerId: string) {
-    const data: SocketMessage = {
-      type: SocketMessageType.DELETE_ANSWER,
-      payload: answerId,
-    };
-
-    ws.send(JSON.stringify(data));
   }
 
   return (
     <SocketContext.Provider
       value={{
-        deleteAnswer,
-        startRound,
-        createGame,
+        setUuid,
         game,
-        goNextRound,
-        round,
         rounds,
         connected,
         games,
-        setAnswerInvisible,
-        setAnswerVisible,
         reconnect,
-        leaveGame,
         setNickname: setNick,
-        sayHello,
         nickname,
         uuid,
-        joinGame,
         connectedPlayers,
-        endRound,
         currentText,
-        setText,
-        setAnswer,
-        deleteGame,
         allAnswers,
       }}
     >

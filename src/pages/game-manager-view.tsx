@@ -1,39 +1,59 @@
+import { ConnectionIndicator } from "@/components/connection-indicator";
+import { DeleteGame } from "@/components/delete-game";
+import { ModeToggle } from "@/components/mode-toggle";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useSocket } from "@/hooks/use-socket";
 import { cn } from "@/lib/utils";
+import { websocket } from "@/lib/websocket";
 import { Eye, EyeOff, Plus, Trash } from "lucide-react";
 import { useState } from "react";
 
 export function GameManagerView() {
-  const {
-    setAnswerVisible,
-    startRound,
-    endRound,
-    setAnswerInvisible,
-    allAnswers,
-    connectedPlayers,
-    game,
-    currentText,
-    setText,
-    goNextRound,
-    rounds,
-    deleteAnswer,
-    round,
-  } = useSocket();
+  const { allAnswers, connectedPlayers, game, currentText, rounds } =
+    useSocket();
   const [newText, setNewText] = useState("");
 
+  const round = rounds.find((r) => r.active);
+
   return (
-    <div className="col-span-3 p-8 flex flex-col gap-4">
-      <div className="h-full grid grid-cols-5 overflow-y-auto gap-4">
-        <div className="col-span-1 flex flex-col gap-4">
+    <div className="col-span-3 p-8 flex flex-col relative gap-8 h-full max-h-full">
+      <div className="flex items-center flex-row flex-nowrap justify-between">
+        <p className="text-xl font-bold">{game?.name}</p>
+        <div className="flex flex-row flex-nowrap gap-4">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              if (game) {
+                websocket.leaveGame(game.id);
+              }
+            }}
+          >
+            Spiel verlassen
+          </Button>
+          <DeleteGame />
+          <ModeToggle />
+          <ConnectionIndicator />
+        </div>
+      </div>
+      <div className="h-full max-h-full flex gap-8 flex-row flex-nowrap w-full">
+        <div className="max-w-[300px] shrink-0 w-full flex flex-col gap-4 h-full">
           <div className="flex flex-row flex-nowrap justify-between items-center">
             <p className="font-bold">Runden</p>
-            <Button size="icon" variant="outline" onClick={() => goNextRound()}>
+            <Button
+              size="icon"
+              variant="outline"
+              onClick={() => {
+                if (game) {
+                  websocket.goNextRound(game.id);
+                }
+              }}
+            >
               <Plus />
             </Button>
           </div>
-          <ul className="h-full overflow-y-auto flex flex-col gap-2">
+          <ul className="h-full overflow-y-auto flex flex-col gap-2 max-h-[800px]">
             {rounds
               .sort((a, b) => {
                 if (a.round < b.round) {
@@ -57,7 +77,7 @@ export function GameManagerView() {
               ))}
           </ul>
         </div>
-        <div className="col-span-2 flex flex-col gap-4 pr-2">
+        <div className="w-full flex flex-col gap-4">
           <p className="font-bold">Frage</p>
           <div className="border-secondary border-2 w-full p-8 rounded-md">
             <p
@@ -86,7 +106,7 @@ export function GameManagerView() {
                   if (!game?.id) {
                     return;
                   }
-                  setText(newText);
+                  websocket.setText(newText);
                 }}
               >
                 Text setzen
@@ -94,15 +114,15 @@ export function GameManagerView() {
               <Button
                 onClick={() => {
                   if (!round.started && !round.ended) {
-                    startRound();
+                    websocket.startRound();
                   }
 
                   if (!round.started && round.ended) {
-                    startRound();
+                    websocket.startRound();
                   }
 
                   if (round.started && !round.ended) {
-                    endRound();
+                    websocket.endRound();
                   }
                 }}
               >
@@ -113,7 +133,7 @@ export function GameManagerView() {
             </div>
           )}
         </div>
-        <div className="col-span-2 flex flex-col gap-4">
+        <div className="w-full flex flex-col gap-4">
           <p className="font-bold">Antworten</p>
           <div className="border-2 w-full rounded-md">
             <ul className="max-h-full overflow-y-auto flex flex-col gap-4">
@@ -144,7 +164,7 @@ export function GameManagerView() {
                       size="icon"
                       variant="destructive"
                       onClick={() => {
-                        deleteAnswer(answer.id);
+                        websocket.deleteAnswer(answer.id);
                       }}
                     >
                       <Trash />
@@ -154,9 +174,9 @@ export function GameManagerView() {
                       variant="outline"
                       onClick={() => {
                         if (answer.revealedToPlayers) {
-                          setAnswerInvisible(answer.id);
+                          websocket.setAnswerInvisible(answer.id);
                         } else {
-                          setAnswerVisible(answer.id);
+                          websocket.setAnswerVisible(answer.id);
                         }
                       }}
                     >

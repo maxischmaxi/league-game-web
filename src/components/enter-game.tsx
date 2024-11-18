@@ -13,9 +13,10 @@ import { Button } from "./ui/button";
 import { useMemo } from "react";
 import { createGameSchema } from "@/lib/schemas";
 import { useSocket } from "@/hooks/use-socket";
+import { websocket } from "@/lib/websocket";
 
 export function EnterGame() {
-  const { createGame, game, games, nickname, joinGame } = useSocket();
+  const { game, games, nickname } = useSocket();
   const form = useForm<z.infer<typeof createGameSchema>>({
     resolver: zodResolver(createGameSchema),
     defaultValues: {
@@ -55,7 +56,7 @@ export function EnterGame() {
                   key={game.id}
                   className="rounded-lg border-2 p-4 hover:bg-secondary cursor-pointer"
                   onClick={() => {
-                    joinGame(game.id);
+                    websocket.joinGame(game.id);
                   }}
                 >
                   {game.name}
@@ -68,7 +69,7 @@ export function EnterGame() {
             <form
               className="flex flex-col gap-4 w-full"
               onSubmit={form.handleSubmit(async (data) => {
-                createGame(data.name);
+                websocket.createGame(data.name);
               })}
             >
               <Input

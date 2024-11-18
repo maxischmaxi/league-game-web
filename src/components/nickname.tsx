@@ -13,28 +13,25 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { useSocket } from "@/hooks/use-socket";
+import { websocket } from "@/lib/websocket";
 
 export function Nickname() {
-  const { nickname, setNickname, sayHello, connected } = useSocket();
+  const { nickname, setNickname } = useSocket();
 
   const form = useForm<z.infer<typeof setNickSchema>>({
     resolver: zodResolver(setNickSchema),
-    disabled: !connected,
     defaultValues: {
       nickname: "",
     },
   });
 
   const open = useMemo(() => {
-    if (!connected) {
-      return false;
-    }
-    if (nickname === "") {
+    if (nickname.length <= 0) {
       return true;
     }
 
     return false;
-  }, [connected, nickname]);
+  }, [nickname]);
 
   return (
     <AlertDialog open={open}>
@@ -49,7 +46,7 @@ export function Nickname() {
           className="w-full space-y-4"
           onSubmit={form.handleSubmit((data) => {
             setNickname(data.nickname);
-            sayHello();
+            websocket.sayHello();
           })}
         >
           <Input
@@ -64,9 +61,7 @@ export function Nickname() {
             name="nickname"
           />
           <div className="flex flex-row justify-end">
-            <Button disabled={!connected} type="submit">
-              Speichern
-            </Button>
+            <Button type="submit">Speichern</Button>
           </div>
         </form>
       </AlertDialogContent>
