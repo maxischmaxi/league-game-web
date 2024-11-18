@@ -1,10 +1,21 @@
 import { Toaster } from "@/components/ui/sonner";
 import { Nickname } from "@/components/nickname";
 import { useSocket } from "@/hooks/use-socket";
-import { GameManagerView } from "@/pages/game-manager-view";
-import { GamePlayerView } from "@/pages/game-player-view";
 import { EnterGame } from "@/components/enter-game";
 import { Button } from "@/components/ui/button";
+import { lazy } from "react";
+
+const GameManagerView = lazy(() =>
+  import("@/pages/game-manager-view").then((mod) => ({
+    default: mod.GameManagerView,
+  })),
+);
+
+const GamePlayerView = lazy(() =>
+  import("@/pages/game-player-view").then((mod) => ({
+    default: mod.GamePlayerView,
+  })),
+);
 
 export function App() {
   const { uuid, reconnect, connected, game } = useSocket();

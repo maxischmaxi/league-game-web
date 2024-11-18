@@ -13,7 +13,6 @@ export function GameManagerView() {
   const { allAnswers, connectedPlayers, game, currentText, rounds } =
     useSocket();
   const [newText, setNewText] = useState("");
-
   const round = rounds.find((r) => r.active);
 
   return (

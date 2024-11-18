@@ -10,7 +10,7 @@ import { SocketContext } from "@/lib/socket";
 import { ReactNode, useEffect, useState } from "react";
 import { websocket } from "@/lib/websocket";
 
-export function SockerProvider({ children }: { children: ReactNode }) {
+export function SocketProvider({ children }: { children: ReactNode }) {
   const [uuid, setUuid] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
   const [nickname, setNickname] = useState(
